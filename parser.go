@@ -1,56 +1,76 @@
 package parser
 
 import (
-	"fmt"
 	"log"
 	"strings"
 
 	"golang.org/x/net/html"
 )
 
-var htm = `
-  <a href="/animal">
-    <div class="container">
-      
-    </div>
-  <a href="/dog">
-        <span>Something in a span</span>
-        Text not in a span
-        <b>Bold text!</b>
-      </a>
-  </a>`
+type Link struct {
+	Link string
+	Data string
+}
 
-func Parser() {
-	doc, err := html.Parse(strings.NewReader(htm))
+func Parser(document string) []Link {
+	doc, err := html.Parse(strings.NewReader(document))
 	if err != nil {
 		log.Fatal(err)
 	}
 
-	htmlItirator(doc)
+	links := linkParser(doc)
+	urls := linkBuilder(links)
+
+	return urls
 }
 
-func htmlItirator(n *html.Node) {
-	if n == nil {
-		return
+func linkBuilder(links []*html.Node) []Link {
+	var ret []Link
+	var value Link
+	var text string
+
+	for _, link := range links {
+		for _, attr := range link.Attr {
+			if attr.Key == "href" {
+				text = textParser(link)
+				value.Link = attr.Val
+				value.Data = text
+			}
+		}
+		ret = append(ret, value)
 	}
 
-	// for _, a := range n.Attr {
-	// 	fmt.Printf("%s: %s\n", a.Key, a.Val)
-	// }
+	return ret
+}
 
-	fmt.Println(" ", n.Data)
+func linkParser(n *html.Node) []*html.Node {
+	var ret []*html.Node
 
-	// c := n
-	//
-	// if n.FirstChild != nil {
-	// 	htmlItirator(c.FirstChild)
-	// }
-	//
-	// if n.NextSibling != nil {
-	// 	htmlItirator(c.NextSibling)
-	// }
+	if n.Type == html.ElementNode && n.Data == "a" {
+		return append(ret, n)
+	}
 
 	for c := n.FirstChild; c != nil; c = c.NextSibling {
-		htmlItirator(c)
+		ret = append(ret, linkParser(c)...)
 	}
+
+	return ret
+}
+
+func textParser(link *html.Node) string {
+	var ret string
+
+	if link.Type == html.TextNode {
+		return link.Data
+	}
+
+	if link.Type != html.ElementNode {
+		return ""
+	}
+
+	for c := link.FirstChild; c != nil; c = c.NextSibling {
+		ret += textParser(c)
+	}
+
+	return strings.Join(strings.Fields(ret), " ")
 }
